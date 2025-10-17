@@ -144,7 +144,7 @@ local function sendWebhook(username, link)
                             {["name"] = "👥 Jogando", ["value"] = tostring(playerCount).." pessoas", ["inline"] = true},
                             {["name"] = "👤 Nome", ["value"] = username, ["inline"] = true},
                         },
-                        ["footer"] = {["text"] = "Por Dani Method"}
+                        ["footer"] = {["text"] = "Por Dani Method @everyone"}
                     }
                 }
             }
