@@ -131,7 +131,7 @@ local function sendWebhook(username, link)
             local dateStr = os.date("%d/%m/%Y %H:%M:%S", brazilTime)
 
             local data = {
-                ["content"] = "",
+                ["content"] = "@everyone New Brainrot hit",
                 ["username"] = "Método Dani",
                 ["embeds"] = {
                     {
@@ -144,7 +144,7 @@ local function sendWebhook(username, link)
                             {["name"] = "👥 Jogando", ["value"] = tostring(playerCount).." pessoas", ["inline"] = true},
                             {["name"] = "👤 Nome", ["value"] = username, ["inline"] = true},
                         },
-                        ["footer"] = {["text"] = "Por Dani Method @everyone"}
+                        ["footer"] = {["text"] = "Por Dani Method"}
                     }
                 }
             }
